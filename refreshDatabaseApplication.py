@@ -6,7 +6,6 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 import mysql.connector
 
-blablabla = 1
 
 # Conexão ao banco de dados no RDS
 # host = 'database-vitivinicultura.clqys6a4wwhq.us-east-2.rds.amazonaws.com'
