@@ -18,6 +18,18 @@ import mysql.connector
 # cursor.execute('Sentença_sql')
 
 
+class paginasDados:
+    def __init__(self, url, nome_pagina, categoria1, sub_option=None, categoria2=None):
+        self.url = url
+        self.nome_pagina = nome_pagina
+        self.sub_option = sub_option
+        self.categoria1 = categoria1
+        self.categoria2 = categoria2
+    def imprime_dados(self):
+        print(self.nome_pagina)
+
+
+
 # Função que pega a primeira página do site
 def geturl(url):
     conteudo = requests.get(url).content
@@ -87,13 +99,14 @@ if data_bd < data_mod:
             link = html_pagina.find('a', class_='footer_content', href=True)['href']
 
             # Montando o item da fila de execução
-            lista_paginas.append([link,nome_pagina])
+            lista_paginas.append(paginasDados(link, nome_pagina, 'categoria1'))
 
         # Tratando os casos onde há subtópicos
         else:
             for k in range(len(nomes_subtopicos)):
                 html_pagina_sopt = BeautifulSoup(geturl(url_sopt(nomes_botoes[i],nomes_subtopicos[k][0])),'html.parser')
                 link_sopt = html_pagina_sopt.find('a', class_='footer_content', href=True)['href']
-                lista_paginas.append([link_sopt,nome_pagina,nomes_subtopicos[k][1]])
+                lista_paginas.append(paginasDados(link, nome_pagina, 'categoria1', sub_option=nomes_subtopicos[k][1]))
 
-print(lista_paginas)
+for i in lista_paginas:
+    i.imprime_dados()
