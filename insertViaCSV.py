@@ -3,6 +3,8 @@ import pandas as pd
 from paginasDados import PaginasDados
 from bs4 import BeautifulSoup
 import csv
+import psycopg2
+import math
 
 
 # Função que pega o conteúdo do html
@@ -11,23 +13,56 @@ def geturl(url):
     return lista
 
 
-def gerar_insert_statement(objeto, categoria, valor_categoria2, valor_categoria3, ano, feature, valor, data):
-    insert_statement = f"""insert into dados
-                        (pagina, categoria, valor_categoria1, valor_categoria2, valor_categoria3, ano, feature, valor_feature, data_inclusao)
-                        values ('{objeto.nome_pagina}','{categoria}','{objeto.sub_option}','{valor_categoria2}','{valor_categoria3}',{ano},'{feature}', {valor}, '{data}')"""
+def converter_para_float(valor):
+    try:
+        if math.isnan(float(valor)):
+            return 0
+        else:
+            return float(valor)
+    except ValueError:
+        return 0
 
 
-f = open("names.txt", "a")
+def nulo_para_string(valor):
+    if valor is None:
+        return 'null'
+    else:
+        return f"'{valor}'"
 
 
-# Variáveis que vão vir do outro código
-lista_paginas = [['download/Producao.csv', 'Produção'], ['download/ProcessaViniferas.csv', 'Processamento', 'Viníferas'], ['download/ProcessaAmericanas.csv', 'Processamento', 'Americanas e híbridas'], ['download/ProcessaMesa.csv', 'Processamento', 'Uvas de mesa'], ['download/ProcessaSemclass.csv', 'Processamento', 'Sem classificação'], ['download/Comercio.csv', 'Comercialização'], ['download/ImpVinhos.csv', 'Importação', 'Vinhos de mesa'], ['download/ImpEspumantes.csv', 'Importação', 'Espumantes'], ['download/ImpFrescas.csv', 'Importação', 'Uvas frescas'], ['download/ImpPassas.csv', 'Importação', 'Uvas passas'], ['download/ImpSuco.csv', 'Importação', 'Suco de uva'], ['download/ExpVinho.csv', 'Exportação', 'Vinhos de mesa'], ['download/ExpEspumantes.csv', 'Exportação', 'Espumantes'], ['download/ExpUva.csv', 'Exportação', 'Uvas frescas'], ['download/ExpSuco.csv', 'Exportação', 'Suco de uva']]
-data_inclusao = 'data'
+def gerar_insert_statement(objeto, valor_categoria2, valor_categoria3, ano, valor, data, tipo, cursor, conexao):
 
-# Baixando o csv
-for n in range(len(lista_paginas)):
-    path_download = (lista_paginas[n][0])
-    download_url = 'http://vitibrasil.cnpuv.embrapa.br/' + path_download
+    sub_option = nulo_para_string(objeto.sub_option)
+
+    if tipo == 0:
+        categoria = objeto.categoria1
+    else:
+        categoria = objeto.categoria2
+
+    valor_categoria2 = nulo_para_string(valor_categoria2)
+
+    valor_fix = converter_para_float(valor)
+
+    f = open("names.txt", "a")
+    insert_statement = f"""insert into dados (pagina, categoria, valor_categoria1, valor_categoria2, valor_categoria3, ano, feature, valor_feature, data_inclusao) values ('{objeto.nome_pagina}','{objeto.categoria0}',{sub_option},{valor_categoria2},'{valor_categoria3}',{ano},'{categoria}', {valor_fix}, '2024-01-01')"""
+    cursor.execute(insert_statement)
+    conexao.commit()
+
+def insert_via_csv(objetos, data):
+
+
+    # Conexão ao banco de dados no RDS
+    host = 'localhost'
+    port = '5432'
+    user = 'postgres'
+    pw = 'admin'
+    db = 'postgres'
+    conexao = psycopg2.connect(host=host, database=db, user=user, password=pw, port=port)
+    cursor = conexao.cursor()
+
+
+    # Baixando o csv
+    download_url = 'http://vitibrasil.cnpuv.embrapa.br/' + objetos.url
     arquivo = geturl(download_url).decode('utf-8')
     indice_separador = arquivo.find('1970')
     fim_separador = arquivo.find('19', indice_separador+1)
@@ -37,47 +72,28 @@ for n in range(len(lista_paginas)):
     list_colunas = list(df.columns)
     index_ano = list_colunas.index('1970')
     len_colunas = len(list_colunas)
-    lista_insert = []
 
+    # Iniciando iterações para varrer data frame
+    for i in range(index_ano, len_colunas):
+        for j in range (0, len(df.id)):
+            if df.iat[j, i] != 0:
+                # Se não há valor_categoria2
+                if index_ano == 2:
+                    # Se é primeira feature
+                    if len(df.columns[i]) == 4:
+                        gerar_insert_statement(objetos, None, df.iat[j, 1], df.columns[i], df.iat[j, i], data, 0, cursor, conexao)
+                    # Se é segunda feature
+                    elif len(df.columns[i]) > 4:
+                        gerar_insert_statement(objetos, None, df.iat[j, 1], df.columns[i][0:4], df.iat[j, i], data, 1, cursor, conexao)
+                # Se há valor_categoria2
+                if index_ano == 3:
 
-# Quando tem subcategorias no csv
-    if len(lista_paginas[n]) == 2:
-        if index_ano == 3:
-            for i in range(index_ano,len_colunas):
-                for j in range(0,len(df.id)):
-                    if df.iat[j, i] != 0:
-                        insert_statement = f"""insert into dados
-                        (pagina, categoria, valor_categoria2, valor_categoria3, ano, feature, valor_feature, data_inclusao)
-                        values ('{lista_paginas[n][1]}','{list_colunas[index_ano-1]}','{df.iat[j, 1]}','{df.iat[j, 2]}',{list_colunas[i]},'feature',{df.iat[j, i]}, '2024-06-30')"""
-                        f.write('\n' + insert_statement)
-        elif index_ano == 2:
-            for i in range(index_ano,len_colunas):
-                for j in range(0,len(df.id)):
-                    if df.iat[j, i] != 0:
-                        insert_statement = f"""insert into dados
-                        (pagina, categoria, valor_categoria2, ano, feature, valor_feature, data_inclusao)
-                        values ('{lista_paginas[n][1]}','{list_colunas[index_ano-1]}','{df.iat[j, 1]}',{list_colunas[i]},'feature',{df.iat[j, i]}, '2024-06-30')"""
-                        f.write('\n' + insert_statement)
-    elif len(lista_paginas[n]) == 3:
-        if index_ano == 3:
-            for i in range(index_ano, len_colunas):
-                for j in range(0, len(df.id)):
-                    print(df.iat[j, i])
-                    if df.iat[j, i] != 0:
-                        insert_statement = f"""insert into dados
-                        (pagina, categoria, valor_categoria1, valor_categoria2, valor_categoria3, ano, feature, valor_feature, data_inclusao)
-                        values ('{lista_paginas[n][1]}','{list_colunas[index_ano - 1]}','{lista_paginas[n][2]}','{df.iat[j, 1]}','{df.iat[j, 2]}',{list_colunas[i]},'feature',{df.iat[j, i]}, '2024-06-30')"""
-                        f.write('\n' + insert_statement)
-        elif index_ano == 2:
-            for i in range(index_ano, len_colunas):
-                for j in range(0, len(df.id)):
-                    print(df.iat[j, i])
-                    if df.iat[j, i] != 0:
-                        insert_statement = f"""insert into dados
-                        (pagina, categoria, valor_categoria1, valor_categoria2, ano, feature, valor_feature, data_inclusao)
-                        values ('{lista_paginas[n][1]}','{list_colunas[index_ano - 1]}','{lista_paginas[n][2]}','{df.iat[j, 1]}',{list_colunas[i]},'feature',{df.iat[j, i]}, '2024-06-30')"""
-                        f.write('\n' + insert_statement)
+                    if df.iat[j, 1] != df.iat[j, 2]:
+                        # Se é primeira feature
+                        if len(df.columns[i]) == 4:
+                            gerar_insert_statement(objetos, df.iat[j, 1], df.iat[j, 2], df.columns[i], df.iat[j,i], data, 0, cursor, conexao)
+                        # Se é segunda feature
+                        elif len(df.columns[i]) > 4:
+                            gerar_insert_statement(objetos, df.iat[j, 1], df.iat[j, 2], df.columns[i][0:4], df.iat[j, i], data, 1, cursor, conexao)
 
-
-
-
+    conexao.close()

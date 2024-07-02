@@ -6,6 +6,7 @@ from paginasDados import PaginasDados
 from datetime import datetime
 from bs4 import BeautifulSoup
 import mysql.connector
+from insertViaCSV import insert_via_csv
 
 
 # Conexão ao banco de dados no RDS
@@ -105,5 +106,6 @@ if data_bd < data_mod:
                 lista_paginas.append(
                     PaginasDados(link_sopt, nome_pagina, categorias[0], sub_option=nomes_subtopicos[k][1], categoria1=categorias[1], categoria2=categorias[2]))
 
+
 for i in lista_paginas:
-    i.print_data()
+    insert_via_csv(i, data_bd)
