@@ -2,6 +2,7 @@ import flask
 from flask import Flask, jsonify, request
 import requests
 import pandas as pd
+from paginasDados import PaginasDados
 from datetime import datetime
 from bs4 import BeautifulSoup
 import mysql.connector
@@ -16,18 +17,6 @@ import mysql.connector
 # conexao = mysql.connector.connect(host=host, database=db, user=user, password=pw)'´
 # cursor = conexao.cursor()
 # cursor.execute('Sentença_sql')
-
-
-class paginasDados:
-    def __init__(self, url, nome_pagina, categoria1, sub_option=None, categoria2=None):
-        self.url = url
-        self.nome_pagina = nome_pagina
-        self.sub_option = sub_option
-        self.categoria1 = categoria1
-        self.categoria2 = categoria2
-    def imprime_dados(self):
-        print(self.nome_pagina)
-
 
 
 # Função que pega a primeira página do site
@@ -93,20 +82,28 @@ if data_bd < data_mod:
         buttons = subtopicos.find_all('button', class_='btn_sopt')
         nomes_subtopicos = [[button['value'], button.text] for button in buttons]
 
+        # Achando a tabela com as features
+        table = html_pagina.find('table', class_='tb_base tb_dados')
+        features = table.find_all('th')
+        categorias = [None, None, None]
+        for idx in range(len(features)):
+            categorias[idx] = features[idx].get_text(strip=True)
+
         # Tratando o caso onde não há subtópicos
         if len(nomes_subtopicos) == 0:
             # Obtendo o link de download
             link = html_pagina.find('a', class_='footer_content', href=True)['href']
-
             # Montando o item da fila de execução
-            lista_paginas.append(paginasDados(link, nome_pagina, 'categoria1'))
+            lista_paginas.append(PaginasDados(link, nome_pagina, categorias[0], categoria1=categorias[1], categoria2=categorias[2]))
 
         # Tratando os casos onde há subtópicos
         else:
             for k in range(len(nomes_subtopicos)):
                 html_pagina_sopt = BeautifulSoup(geturl(url_sopt(nomes_botoes[i],nomes_subtopicos[k][0])),'html.parser')
                 link_sopt = html_pagina_sopt.find('a', class_='footer_content', href=True)['href']
-                lista_paginas.append(paginasDados(link, nome_pagina, 'categoria1', sub_option=nomes_subtopicos[k][1]))
+
+                lista_paginas.append(
+                    PaginasDados(link_sopt, nome_pagina, categorias[0], sub_option=nomes_subtopicos[k][1], categoria1=categorias[1], categoria2=categorias[2]))
 
 for i in lista_paginas:
-    i.imprime_dados()
+    i.print_data()

@@ -1,16 +1,8 @@
 import requests
 import pandas as pd
+from paginasDados import PaginasDados
 from bs4 import BeautifulSoup
 import csv
-class paginasDados:
-    def __init__(self, url, nome_pagina, categoria1, sub_option=None, categoria2=None):
-        self.url = url
-        self.nome_pagina = nome_pagina
-        self.sub_option = sub_option
-        self.categoria1 = categoria1
-        self.categoria2 = categoria2
-    def imprime_dados(self):
-        print(self.nome_pagina)
 
 
 # Função que pega o conteúdo do html
