@@ -34,6 +34,7 @@ def gerar_insert_statement(objeto, valor_categoria2, valor_categoria3, ano, valo
 
     sub_option = nulo_para_string(objeto.sub_option)
 
+    # Para saber qual o tipo de feature para os casos que tem duas
     if tipo == 0:
         categoria = objeto.categoria1
     else:

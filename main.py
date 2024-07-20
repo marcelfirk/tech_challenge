@@ -30,8 +30,13 @@ def str_para_data(str):
 
 # Função que traz a URL da sub option conforme opt e sopt enviadas
 def url_sopt(opt, sopt):
-    url_sopt = f'http://vitibrasil.cnpuv.embrapa.br/index.php?subopcao={sopt}&opcao={opt}'
-    return url_sopt
+    url = f'http://vitibrasil.cnpuv.embrapa.br/index.php?subopcao={sopt}&opcao={opt}'
+    return url
+
+
+def url_sopt_ano(opt, sopt, ano):
+    url = f'http://vitibrasil.cnpuv.embrapa.br/index.php?ano={ano}&subopcao={sopt}&opcao={opt}'
+    return url
 
 
 app = Flask(__name__)
@@ -56,7 +61,7 @@ app = Flask(__name__)
 #     return jsonify(access_token=access_token), 200
 
 
-@app.route('/api/listaPaginas', methods=['GET'])
+@app.route('/api/listaPaginas/', methods=['GET'])
 # @jwt_required()
 def get_lista_paginas():
     # Home para scrapping inicial
@@ -113,6 +118,7 @@ def get_lista_paginas():
     lista_json = json.dumps(lista_paginas, ensure_ascii=False, indent=4)
     return lista_json
 
+
 @app.route('/api/ultimaAtualizacao', methods=['GET'])
 def get_ultima_atualizacao():
     # Home para scrapping inicial
@@ -127,6 +133,7 @@ def get_ultima_atualizacao():
 
     return json.dumps(data_mod, ensure_ascii=False, indent=4)
 
+
 @app.route('/api/disponibilidade', methods=['GET'])
 def get_disponibilidade():
     try:
@@ -137,9 +144,51 @@ def get_disponibilidade():
         return json.dumps({"status": "indisponivel"}, ensure_ascii=False, indent=4)
 
 
+@app.route('/api/pesquisa', methods=['GET'])
+# @jwt_required()
+def get_pesquisa():
+    option = request.args.get('option')
+    sub_option = request.args.get('sub_option')
+    ano = request.args.get('ano')
+    categoria = request.args.get('categoria')
+    valor = None
+
+    html_pagina_sopt = BeautifulSoup(geturl(url_sopt_ano(option, sub_option, ano)), 'html.parser').find('table', attrs={"class": 'tb_base tb_dados'})
+    headers = html_pagina_sopt.thead
+    table = html_pagina_sopt.tbody
+    lista_headers = []
+    lista_resultados = {}
+
+    # Encontrando os nomes dos valores
+    if headers:
+        ths = headers.find_all('th')
+        for i in ths:
+            lista_headers.append(i.text.strip())
+        print(lista_headers)
+
+    else:
+        valor = "Erro 406"
+
+    # Encontrando os valores
+    if table:
+        trs = table.find_all('tr')
+        for i in trs:
+            cells = i.find_all('td')
+            if cells[0].text.strip() == categoria:
+                for j in range(len(cells)):
+                    lista_resultados[lista_headers[j]] = cells[j].text.strip()
+                break
+            valor = "Erro 405"
+    else:
+        valor = "Erro 404"
+
+    return json.dumps(lista_resultados, ensure_ascii=False, indent=4)
+
+
 @app.route('/')
 def index():
     return 'Hello!'
+
 
 if __name__ == '__main__':
     app.run(debug=True)
