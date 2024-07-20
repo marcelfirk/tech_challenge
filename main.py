@@ -151,7 +151,6 @@ def get_pesquisa():
     sub_option = request.args.get('sub_option')
     ano = request.args.get('ano')
     categoria = request.args.get('categoria')
-    valor = None
 
     html_pagina_sopt = BeautifulSoup(geturl(url_sopt_ano(option, sub_option, ano)), 'html.parser').find('table', attrs={"class": 'tb_base tb_dados'})
     headers = html_pagina_sopt.thead
