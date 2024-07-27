@@ -1,13 +1,11 @@
-import json
-import requests
-from paginasDados import PaginasDados
-from bs4 import BeautifulSoup
 from datetime import datetime
-from flask import Flask, jsonify, request
-import pandas as pd
-from io import StringIO
-# from flask_jwt_extended import JWTManager, create_access_token, decode_token, jwt_required
 
+import requests
+from bs4 import BeautifulSoup
+from flask import Flask, jsonify, request
+# from flask_jwt_extended import jwt_required
+
+from paginasDados import PaginasDados
 
 # Parâmetros globais
 url_home = 'http://vitibrasil.cnpuv.embrapa.br/'
@@ -206,24 +204,39 @@ def get_params():
     except AttributeError as e:
         return jsonify({"error": "Erro, verifique se passou parâmetros corretos de paginas e subpaginas"}), 400
     table = html_pagina_sopt.tbody
+    if len(table) == 1:
+        return jsonify({"error": "Verifique os parâmetros enviados"}), 400
     item = headers.find_all('th')[0].text.strip()
-    itens = {"item": item}
-    lista_itens = []
 
-    # Encontrando os valores
+    dict_itens = {}
+    # pai = ""
+    # filho = ""
+    sem_classificacao = True
     if table:
         trs = table.find_all('tr')
         for i in range(len(trs)):
             tds = trs[i].find_all('td')
             if "tb_item" in tds[0].get('class', []):
                 pai = tds[0].text.strip()
-            else:
+            elif "tb_subitem" in tds[0].get('class', []):
+                sem_classificacao = False
                 filho = tds[0].text.strip()
-            lista_itens = lista_itens.append([pai, filho])
+                if pai in dict_itens:
+                    dict_itens[pai].append(filho)
+                else:
+                    dict_itens[pai] = [filho]
+            elif tds:
+                sem_classificacao = False
+                if item in dict_itens:
+                    dict_itens[item].append(tds[0].text.strip())
+                else:
+                    dict_itens[item] = [tds[0].text.strip()]
 
+        if sem_classificacao:
+            dict_itens[item] = [pai]
 
+    return (dict_itens)
 
-    return jsonify(lista_itens)
 
 @app.route('/')
 def index():
