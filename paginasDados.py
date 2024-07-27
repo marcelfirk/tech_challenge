@@ -1,35 +1,26 @@
-import json
-
-
 class PaginasDados:
-    def __init__(self, url, nome_pagina, categoria0, sub_option=None, categoria1=None, categoria2=None):
-        self.url = url
-        self.nome_pagina = nome_pagina
-        self.sub_option = sub_option
-        self.categoria0 = categoria0
-        self.categoria1 = categoria1
-        self.categoria2 = categoria2
-
-    def print_data(self):
-        dados = self.url + ", " + self.nome_pagina
-        if self.sub_option is not None:
-            dados += ", " + self.sub_option
-        dados += ", " + self.categoria0
-        if self.categoria1 is not None:
-            dados += ", " + self.categoria1
-        if self.categoria2 is not None:
-            dados += ", " + self.categoria2
-        return print(dados)
+    def __init__(self, pagina, cod_pagina, csv_download, item, feature0,
+                 subpagina=None, cod_subpagina=None, feature1=None):
+        self.pagina = pagina
+        self.cod_pagina = cod_pagina
+        self.csv_download = csv_download
+        self.item = item
+        self.feature0 = feature0
+        self.subpagina = subpagina
+        self.cod_subpagina = cod_subpagina
+        self.feature1 = feature1
 
     def to_dict(self):
         # Cria um dicionário com os atributos do objeto
         data = {
-            "url": self.url,
-            "nome_pagina": self.nome_pagina,
-            "sub_option": self.sub_option,
-            "categoria0": self.categoria0,
-            "categoria1": self.categoria1,
-            "categoria2": self.categoria2
+            "pagina": self.pagina,
+            "codPagina": self.cod_pagina,
+            "subpagina": self.subpagina,
+            "codSubpagina": self.cod_subpagina,
+            "csvDownload": self.csv_download,
+            "item": self.item,
+            "feature0": self.feature0,
+            "feature1": self.feature1
         }
         # Converte o dicionário para uma string JSON
         return data

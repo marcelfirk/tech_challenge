@@ -1,5 +1,4 @@
 import json
-
 import requests
 from paginasDados import PaginasDados
 from bs4 import BeautifulSoup
@@ -17,29 +16,31 @@ lista_paginas = []
 
 
 # Funções globais
-def geturl(url):
-    conteudo = requests.get(url).content
-    return conteudo
+def geturl(url: str) -> bytes:
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.content
+    except requests.RequestException:
+        return b''
 
 
 # Função que transforma data no formato do site para datetime
-def str_para_data(str):
-    data = datetime(2000 + int(str[6:8]), int(str[3:5]), int(str[0:2]))
-    return data
+def str_para_data(data_str: str) -> datetime:
+    return datetime(2000 + int(data_str[6:8]), int(data_str[3:5]), int(data_str[0:2]))
 
 
 # Função que traz a URL da sub option conforme opt e sopt enviadas
-def url_sopt(opt, sopt):
-    url = f'http://vitibrasil.cnpuv.embrapa.br/index.php?subopcao={sopt}&opcao={opt}'
-    return url
+def url_sopt(opt: str, sopt: str) -> str:
+    return f'http://vitibrasil.cnpuv.embrapa.br/index.php?subopcao={sopt}&opcao={opt}'
 
 
-def url_sopt_ano(opt, sopt, ano):
-    url = f'http://vitibrasil.cnpuv.embrapa.br/index.php?ano={ano}&subopcao={sopt}&opcao={opt}'
-    return url
+def url_sopt_ano(opt: str, sopt: str, ano: str) -> str:
+    return f'http://vitibrasil.cnpuv.embrapa.br/index.php?ano={ano}&subopcao={sopt}&opcao={opt}'
 
 
 app = Flask(__name__)
+app.config['JSON_AS_ASCII'] = False
 
 # Cria uma chave para a autenticação JWT
 # app.config['JWT_SECRET_KEY'] = 'marcelGabriel'  # Troque por uma chave secreta forte
@@ -61,28 +62,28 @@ app = Flask(__name__)
 #     return jsonify(access_token=access_token), 200
 
 
-@app.route('/api/listaPaginas/', methods=['GET'])
+@app.route('/api/listaPaginas', methods=['GET'])
 # @jwt_required()
 def get_lista_paginas():
     # Home para scrapping inicial
-    html = BeautifulSoup(geturl(url_home), 'html.parser')
+    try:
+        html = BeautifulSoup(geturl(url_home), 'html.parser')
+    except:
+        return jsonify({"error": "Erro ao obter html da página"})
 
-    # Achando o nome da página
+    # Achando os nomes das páginas
     paginas = html.find('td', attrs={"class": 'col_center', 'id': 'row_height'}).p
 
     # Achando os botões das options
     botoes = paginas.find_all('button', class_='btn_opt')
-    nomes_botoes = [button['value'] for button in botoes]
-    nomes_botoes.pop(0)
-    nomes_botoes.pop(-1)
+    nomes_botoes = [botao['value'] for botao in botoes][1:-1]
 
-    for i in range(len(nomes_botoes)):
-        html_pagina = BeautifulSoup(geturl(''.join([url_opt, nomes_botoes[i]])), 'html.parser')
+    for nome_botao in nomes_botoes:
+        html_pagina = BeautifulSoup(geturl(''.join([url_opt, nome_botao])), 'html.parser')
 
         # Achando o nome da página
         paginas = html_pagina.find('td', attrs={"class": 'col_center', "id": "row_height"})
-        nome_pagina = paginas.find('button', {
-            'value': f'{nomes_botoes[i]}'}).text  # tirar essa parte depois incluindo o nome na lista
+        pagina = paginas.find('button', {'value': f'{nome_botao}'}).text
 
         # Verificando se há subtópicos
         subtopicos = html_pagina.find('table', class_='tb_base tb_header no_print').p
@@ -91,69 +92,71 @@ def get_lista_paginas():
 
         # Achando a tabela com as features
         table = html_pagina.find('table', class_='tb_base tb_dados')
-        features = table.find_all('th')
-        categorias = [None, None, None]
-        for idx in range(len(features)):
-            categorias[idx] = features[idx].get_text(strip=True)
+        ths = table.find_all('th')
+        features = [None, None, None]
+        for idx, feature in enumerate(ths):
+            features[idx] = feature.get_text(strip=True)
 
         # Tratando o caso onde não há subtópicos
-        if len(nomes_subtopicos) == 0:
+        if not nomes_subtopicos:
             # Obtendo o link de download
             link = html_pagina.find('a', class_='footer_content', href=True)['href']
             # Montando o item da fila de execução
             lista_paginas.append(
-                PaginasDados(link, nome_pagina, categorias[0], categoria1=categorias[1], categoria2=categorias[2]).to_dict())
+                PaginasDados(pagina, nome_botao, link, features[0], features[1], feature1=features[2]).to_dict())
 
         # Tratando os casos onde há subtópicos
         else:
-            for k in range(len(nomes_subtopicos)):
-                html_pagina_sopt = BeautifulSoup(geturl(url_sopt(nomes_botoes[i], nomes_subtopicos[k][0])),
-                                                 'html.parser')
+            for cod_sopt, nome_sopt in nomes_subtopicos:
+                html_pagina_sopt = BeautifulSoup(geturl(url_sopt(nome_botao, cod_sopt)), 'html.parser')
                 link_sopt = html_pagina_sopt.find('a', class_='footer_content', href=True)['href']
-
                 lista_paginas.append(
-                    PaginasDados(link_sopt, nome_pagina, categorias[0], sub_option=nomes_subtopicos[k][1],
-                                 categoria1=categorias[1], categoria2=categorias[2]).to_dict())
+                    PaginasDados(pagina, nome_botao, link_sopt, features[0], features[1], subpagina=nome_sopt,
+                                 cod_subpagina=cod_sopt,  feature1=features[2]).to_dict())
 
-    lista_json = json.dumps(lista_paginas, ensure_ascii=False, indent=4)
-    return lista_json
+    # lista_json = json.dumps(lista_paginas, ensure_ascii=False, indent=4)
+    return jsonify(lista_paginas)
 
 
 @app.route('/api/ultimaAtualizacao', methods=['GET'])
 def get_ultima_atualizacao():
     # Home para scrapping inicial
     html = BeautifulSoup(geturl(url_home), 'html.parser')
-
-    # Variável para verificação se é necessária atualização do RDS
     data_mod_str = html.find('table', attrs={"class": 'tb_base tb_footer'}).td.text.split()[-1]
     data_mod = {"dataAtualizacaoSite": data_mod_str}
-
-    # Obtendo a data da última modificação do banco de dados
-    data_bd = datetime(2023, 1, 1)  # arrumar para a consulta no banco de dados dps
-
-    return json.dumps(data_mod, ensure_ascii=False, indent=4)
+    return jsonify(data_mod)
 
 
 @app.route('/api/disponibilidade', methods=['GET'])
 def get_disponibilidade():
     try:
         response = requests.get(url_home)
-        if response.status_code == 200:
-            return json.dumps({"status": "disponivel"}, ensure_ascii=False, indent=4)
-    except requests.exceptions.RequestException:
-        return json.dumps({"status": "indisponivel"}, ensure_ascii=False, indent=4)
+        status = "disponivel" if response.status_code == 200 else "indisponivel"
+    except requests.RequestException:
+        status = "indisponivel"
+    return jsonify({"status": status})
 
 
 @app.route('/api/pesquisa', methods=['GET'])
 # @jwt_required()
 def get_pesquisa():
-    option = request.args.get('option')
-    sub_option = request.args.get('sub_option')
+    cod_pagina = request.args.get('codPagina')
+    cod_subpagina = request.args.get('codSubpagina')
     ano = request.args.get('ano')
-    categoria = request.args.get('categoria')
+    pai = request.args.get('itemPai')
+    filho = request.args.get('item')
 
-    html_pagina_sopt = BeautifulSoup(geturl(url_sopt_ano(option, sub_option, ano)), 'html.parser').find('table', attrs={"class": 'tb_base tb_dados'})
-    headers = html_pagina_sopt.thead
+    if not filho or not cod_pagina or not ano:
+        return jsonify({"error": "Parâmetros obrigatórios insuficientes. Obrigatórios: codPagina, ano, item"}), 400
+
+    html_pagina_sopt = BeautifulSoup(
+        geturl(
+            url_sopt_ano(cod_pagina, cod_subpagina, ano)
+        ), 'html.parser').find('table', attrs={"class": 'tb_base tb_dados'})
+    try:
+        headers = html_pagina_sopt.thead
+    except AttributeError as e:
+        return jsonify({"error": "Erro, verifique se passou parâmetros corretos de paginas e subpaginas"}), 400
     table = html_pagina_sopt.tbody
     lista_headers = []
     lista_resultados = {}
@@ -161,28 +164,66 @@ def get_pesquisa():
     # Encontrando os nomes dos valores
     if headers:
         ths = headers.find_all('th')
-        for i in ths:
-            lista_headers.append(i.text.strip())
-        print(lista_headers)
-
+        lista_headers = [th.text.strip() for th in ths]
     else:
-        valor = "Erro 406"
+        return jsonify({"error": "Erro, verifique se passou parâmetros corretos de paginas e subpaginas"}), 400
 
     # Encontrando os valores
     if table:
         trs = table.find_all('tr')
-        for i in trs:
-            cells = i.find_all('td')
-            if cells[0].text.strip() == categoria:
-                for j in range(len(cells)):
-                    lista_resultados[lista_headers[j]] = cells[j].text.strip()
+        found = False
+        escopo = False if pai else True
+        for tr in trs:
+            tds = tr.find_all('td')
+            if "tb_item" in tds[0].get('class', []) and not escopo:
+                escopo = True if tds[0].text.strip() == pai else False
+            if tds[0].text.strip() == filho and escopo:
+                lista_resultados = {lista_headers[j]: tds[j].text.strip() for j in range(len(tds))}
+                found = True
                 break
-            valor = "Erro 405"
+        if not found:
+            return jsonify({"error": "Item não encontrado no escopo solicitado"}), 400
     else:
-        valor = "Erro 404"
+        return jsonify({"error": "Erro, verifique se passou parâmetros corretos de paginas e subpaginas"}), 400
 
-    return json.dumps(lista_resultados, ensure_ascii=False, indent=4)
+    return jsonify(lista_resultados)
 
+
+@app.route('/api/getItens', methods=['GET'])
+# @jwt_required()
+def get_params():
+    cod_pagina = request.args.get('codPagina')
+    cod_subpagina = request.args.get('codSubpagina')
+    if not cod_pagina:
+        return jsonify({"error": "Parâmetros obrigatórios insuficientes. Obrigatórios: codPagina"}), 400
+
+    html_pagina_sopt = BeautifulSoup(
+        geturl(
+            url_sopt(cod_pagina, cod_subpagina)
+        ), 'html.parser').find('table', attrs={"class": 'tb_base tb_dados'})
+    try:
+        headers = html_pagina_sopt.thead
+    except AttributeError as e:
+        return jsonify({"error": "Erro, verifique se passou parâmetros corretos de paginas e subpaginas"}), 400
+    table = html_pagina_sopt.tbody
+    item = headers.find_all('th')[0].text.strip()
+    itens = {"item": item}
+    lista_itens = []
+
+    # Encontrando os valores
+    if table:
+        trs = table.find_all('tr')
+        for i in range(len(trs)):
+            tds = trs[i].find_all('td')
+            if "tb_item" in tds[0].get('class', []):
+                pai = tds[0].text.strip()
+            else:
+                filho = tds[0].text.strip()
+            lista_itens = lista_itens.append([pai, filho])
+
+
+
+    return jsonify(lista_itens)
 
 @app.route('/')
 def index():
