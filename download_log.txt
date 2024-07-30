@@ -1,0 +1,15 @@
+2024-07-29 21:29:23: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Produção\Produção_20240729212923.csv - user: Marcel Firkowski
+2024-07-29 21:29:25: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Processamento\Viníferas\Processamento_Viníferas_20240729212925.csv - user: Marcel Firkowski
+2024-07-29 21:29:28: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Processamento\Americanas e híbridas\Processamento_Americanas e híbridas_20240729212928.csv - user: Marcel Firkowski
+2024-07-29 21:29:30: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Processamento\Uvas de mesa\Processamento_Uvas de mesa_20240729212930.csv - user: Marcel Firkowski
+2024-07-29 21:29:32: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Processamento\Sem classificação\Processamento_Sem classificação_20240729212932.csv - user: Marcel Firkowski
+2024-07-29 21:29:34: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Comercialização\Comercialização_20240729212934.csv - user: Marcel Firkowski
+2024-07-29 21:29:36: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Importação\Vinhos de mesa\Importação_Vinhos de mesa_20240729212936.csv - user: Marcel Firkowski
+2024-07-29 21:29:39: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Importação\Espumantes\Importação_Espumantes_20240729212939.csv - user: Marcel Firkowski
+2024-07-29 21:29:41: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Importação\Uvas frescas\Importação_Uvas frescas_20240729212941.csv - user: Marcel Firkowski
+2024-07-29 21:29:43: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Importação\Uvas passas\Importação_Uvas passas_20240729212943.csv - user: Marcel Firkowski
+2024-07-29 21:29:45: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Importação\Suco de uva\Importação_Suco de uva_20240729212945.csv - user: Marcel Firkowski
+2024-07-29 21:29:47: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Exportação\Vinhos de mesa\Exportação_Vinhos de mesa_20240729212947.csv - user: Marcel Firkowski
+2024-07-29 21:29:50: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Exportação\Espumantes\Exportação_Espumantes_20240729212950.csv - user: Marcel Firkowski
+2024-07-29 21:29:52: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Exportação\Uvas frescas\Exportação_Uvas frescas_20240729212952.csv - user: Marcel Firkowski
+2024-07-29 21:29:54: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Exportação\Suco de uva\Exportação_Suco de uva_20240729212954.csv - user: Marcel Firkowski

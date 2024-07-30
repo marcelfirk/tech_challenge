@@ -1,16 +1,77 @@
 from datetime import datetime
-
+import pandas as pd
+import shutil
+import os
+import fnmatch
+import json
 import requests
 from bs4 import BeautifulSoup
 from flask import Flask, jsonify, request
+import csv
 # from flask_jwt_extended import jwt_required
-
 from paginasDados import PaginasDados
 
 # Parâmetros globais
 url_home = 'http://vitibrasil.cnpuv.embrapa.br/'
 url_opt = 'http://vitibrasil.cnpuv.embrapa.br/index.php?opcao='
-lista_paginas = []
+arquivo_origem = 'lista_paginas.json'
+
+
+def movimenta_csv_para_backup(diretorio, prefixo):
+    diretorio_backup = f'{diretorio}\\Backups'
+    arquivos = os.listdir(diretorio)
+    for arquivo in arquivos:
+        if fnmatch.fnmatch(arquivo, f'{prefixo}*'):
+            if not os.path.exists(diretorio_backup):
+                os.makedirs(diretorio_backup)
+            path_origem = os.path.join(diretorio, arquivo)
+            path_destino = f'{diretorio_backup}\\{arquivo}'
+            shutil.move(path_origem,path_destino)
+
+
+def download_csv(url, diretorio_csv, nome_arquivo, user):
+    response = requests.get(url)
+    response.raise_for_status()
+    if not os.path.exists(diretorio_csv):
+        os.makedirs(diretorio_csv)
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    movimenta_csv_para_backup(diretorio_csv, nome_arquivo)
+    nome_arquivo = f"{nome_arquivo}_{timestamp}.csv"
+    path_arquivo = os.path.join(diretorio_csv, nome_arquivo)
+    with open(path_arquivo, 'wb') as file:
+        file.write(response.content)
+    log_download(path_arquivo, user)
+    return path_arquivo
+
+
+def log_download(nome_arquivo, user):
+    log_file = "download_log.txt"
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    entrada_log = f"{timestamp}: {nome_arquivo} - user: {user}\n"
+    with open(log_file, 'a') as file:
+        file.write(entrada_log)
+
+
+def abre_json(nome_arquivo):
+    try:
+        with open(nome_arquivo, 'r', encoding='utf-8') as arquivo:
+            data = json.load(arquivo)
+        return data
+    except FileNotFoundError:
+        return None
+    except json.JSONDecodeError:
+        return None
+
+
+def percorre_json(data_a_percorrer, campo1, valor1, campo2=None, valor2=None):
+    for entry in data_a_percorrer:
+        if valor2 is None:
+            if entry.get(campo1) == valor1:
+                return entry
+        else:
+            if entry.get(campo1) == valor1 and entry.get(campo2) == valor2:
+                return entry
+    return None
 
 
 # Funções globais
@@ -23,18 +84,118 @@ def geturl(url: str) -> bytes:
         return b''
 
 
-# Função que transforma data no formato do site para datetime
-def str_para_data(data_str: str) -> datetime:
-    return datetime(2000 + int(data_str[6:8]), int(data_str[3:5]), int(data_str[0:2]))
-
-
-# Função que traz a URL da sub option conforme opt e sopt enviadas
 def url_sopt(opt: str, sopt: str) -> str:
     return f'http://vitibrasil.cnpuv.embrapa.br/index.php?subopcao={sopt}&opcao={opt}'
 
 
 def url_sopt_ano(opt: str, sopt: str, ano: str) -> str:
     return f'http://vitibrasil.cnpuv.embrapa.br/index.php?ano={ano}&subopcao={sopt}&opcao={opt}'
+
+
+def pesquisa_site(html_pagina_sopt, pai, filho):
+    try:
+        headers = html_pagina_sopt.thead
+    except AttributeError:
+        return jsonify({"error": "Erro, verifique se passou parâmetros corretos de paginas e subpaginas"}), 400
+    table = html_pagina_sopt.tbody
+    lista_headers = []
+    lista_resultados = {}
+    if headers:
+        ths = headers.find_all('th')
+        lista_headers = [th.text.strip() for th in ths]
+    else:
+        return jsonify({"error": "Erro, verifique se passou parâmetros corretos de paginas e subpaginas"}), 400
+    if table:
+        trs = table.find_all('tr')
+        found = False
+        escopo = False if pai else True
+        for tr in trs:
+            tds = tr.find_all('td')
+            if "tb_item" in tds[0].get('class', []) and not escopo:
+                escopo = True if tds[0].text.strip() == pai else False
+            if tds[0].text.strip() == filho and escopo:
+                lista_resultados = {lista_headers[j]: tds[j].text.strip() for j in range(len(tds))}
+                found = True
+                break
+        if not found:
+            return jsonify({"error": "Item não encontrado no escopo solicitado"}), 400
+    else:
+        return jsonify({"error": "Erro, verifique se passou parâmetros corretos de paginas e subpaginas"}), 400
+
+    return jsonify(lista_resultados)
+
+
+def detectar_delimitador(file_path):
+    with open(file_path, 'r', encoding='utf-8') as file:
+        sample = file.read(-1)
+        sniffer = csv.Sniffer()
+        try:
+            delimiter = sniffer.sniff(sample).delimiter
+        except csv.Error:
+            delimiter = ';'
+    return delimiter
+
+
+def pesquisa_valor(dataframe, nome_coluna, valor_coluna, ano):
+    # Filter the DataFrame for the specific country and year
+    result = dataframe.query(f'{nome_coluna} == @valor_coluna and ano == @ano')
+    result_json_str = result.to_json(orient='records', date_format='iso', force_ascii=False)
+    result_json = json.loads(result_json_str)
+    return result_json
+
+
+def verifica_nome_arquivo(diretorio, prefixo):
+    arquivos = os.listdir(diretorio)
+    for arquivo in arquivos:
+        if fnmatch.fnmatch(arquivo, f'{prefixo}*'):
+            return os.path.join(diretorio, arquivo)
+        else:
+            return None
+
+
+def pesquisa_csv(cod_pagina, cod_subpagina, ano, valor_coluna):
+    selecao = percorre_json(abre_json('lista_paginas.json'), 'codPagina', cod_pagina, 'codSubpagina', cod_subpagina)
+    diretorio = os.path.join(os.getcwd(), 'CSVs', selecao.get('pagina'))
+    prefixo = selecao.get('pagina')
+    if selecao.get('codSubpagina'):
+        diretorio = os.path.join(diretorio, selecao.get('subpagina'))
+        prefixo = f"{prefixo}_{selecao.get('subpagina')}"
+    arquivo = verifica_nome_arquivo(diretorio, prefixo)
+    delimiter = detectar_delimitador(arquivo)
+    df = pd.read_csv(arquivo, sep=delimiter, encoding='utf-8')
+    colunas = df.columns.tolist()
+    index_1970 = colunas.index('1970')
+    colunas_precedentes = colunas[:index_1970]
+    colunas_para_limpar = colunas[1:index_1970]
+    df[colunas_para_limpar] = df[colunas_para_limpar].apply(lambda x: x.str.strip() if x.dtype == "object" else x)
+    df_transposta = df.melt(id_vars=colunas_precedentes, var_name="ano", value_name="valor")
+    df_transposta["ano"] = df_transposta["ano"].str.replace(".1", "")
+    if 'control' in df_transposta.columns and df_transposta['control'].notnull().any():
+        df_transposta['control'] = substituir_valor(df_transposta['control'])
+    nome_coluna = colunas_precedentes[-1]
+    resultado = pesquisa_valor(df_transposta, nome_coluna, valor_coluna, ano)
+    lista_resultados = []
+    if selecao.get('feature1'):
+        for i in range(len(resultado)):
+            lista_resultados.append({
+                nome_coluna: resultado[i].get(nome_coluna),
+                selecao.get(f'feature{i}'): resultado[i].get('valor')
+            })
+    else:
+        for i in range(len(resultado)):
+            lista_resultados.append({
+                'control': resultado[i].get('control'),
+                nome_coluna: resultado[i].get(nome_coluna),
+                selecao.get('feature0'): resultado[i].get('valor')
+            })
+    return jsonify(lista_resultados)
+
+
+def substituir_valor(col):
+    while col.str.contains("_", na=False).any():
+        col_anterior = col.shift(1)
+        col = col.where(~col.str.contains("_", na=False), col_anterior)
+    return col
 
 
 app = Flask(__name__)
@@ -63,6 +224,9 @@ app.config['JSON_AS_ASCII'] = False
 @app.route('/api/listaPaginas', methods=['GET'])
 # @jwt_required()
 def get_lista_paginas():
+    # Inicializando a lista localmente
+    lista_paginas = []
+
     # Home para scrapping inicial
     try:
         html = BeautifulSoup(geturl(url_home), 'html.parser')
@@ -110,9 +274,10 @@ def get_lista_paginas():
                 link_sopt = html_pagina_sopt.find('a', class_='footer_content', href=True)['href']
                 lista_paginas.append(
                     PaginasDados(pagina, nome_botao, link_sopt, features[0], features[1], subpagina=nome_sopt,
-                                 cod_subpagina=cod_sopt,  feature1=features[2]).to_dict())
+                                 cod_subpagina=cod_sopt, feature1=features[2]).to_dict())
 
-    # lista_json = json.dumps(lista_paginas, ensure_ascii=False, indent=4)
+    with open(arquivo_origem, 'w', encoding='utf-8') as file:
+        json.dump(lista_paginas, file, ensure_ascii=False, indent=4)
     return jsonify(lista_paginas)
 
 
@@ -144,47 +309,24 @@ def get_pesquisa():
     pai = request.args.get('itemPai')
     filho = request.args.get('item')
 
+    site_offline = True
+
     if not filho or not cod_pagina or not ano:
         return jsonify({"error": "Parâmetros obrigatórios insuficientes. Obrigatórios: codPagina, ano, item"}), 400
 
-    html_pagina_sopt = BeautifulSoup(
-        geturl(
-            url_sopt_ano(cod_pagina, cod_subpagina, ano)
-        ), 'html.parser').find('table', attrs={"class": 'tb_base tb_dados'})
     try:
-        headers = html_pagina_sopt.thead
-    except AttributeError as e:
-        return jsonify({"error": "Erro, verifique se passou parâmetros corretos de paginas e subpaginas"}), 400
-    table = html_pagina_sopt.tbody
-    lista_headers = []
-    lista_resultados = {}
+        html_pagina_sopt = BeautifulSoup(
+            geturl(
+                url_sopt_ano(cod_pagina, cod_subpagina, ano)
+            ), 'html.parser').find('table', attrs={"class": 'tb_base tb_dados'})
+    except requests.exceptions.RequestException:
+        site_offline = True
 
-    # Encontrando os nomes dos valores
-    if headers:
-        ths = headers.find_all('th')
-        lista_headers = [th.text.strip() for th in ths]
+    if not site_offline:
+        return pesquisa_site(html_pagina_sopt, pai, filho)
+
     else:
-        return jsonify({"error": "Erro, verifique se passou parâmetros corretos de paginas e subpaginas"}), 400
-
-    # Encontrando os valores
-    if table:
-        trs = table.find_all('tr')
-        found = False
-        escopo = False if pai else True
-        for tr in trs:
-            tds = tr.find_all('td')
-            if "tb_item" in tds[0].get('class', []) and not escopo:
-                escopo = True if tds[0].text.strip() == pai else False
-            if tds[0].text.strip() == filho and escopo:
-                lista_resultados = {lista_headers[j]: tds[j].text.strip() for j in range(len(tds))}
-                found = True
-                break
-        if not found:
-            return jsonify({"error": "Item não encontrado no escopo solicitado"}), 400
-    else:
-        return jsonify({"error": "Erro, verifique se passou parâmetros corretos de paginas e subpaginas"}), 400
-
-    return jsonify(lista_resultados)
+        return pesquisa_csv(cod_pagina, cod_subpagina, ano, filho)
 
 
 @app.route('/api/getItens', methods=['GET'])
@@ -209,8 +351,6 @@ def get_params():
     item = headers.find_all('th')[0].text.strip()
 
     dict_itens = {}
-    # pai = ""
-    # filho = ""
     sem_classificacao = True
     if table:
         trs = table.find_all('tr')
@@ -235,7 +375,29 @@ def get_params():
         if sem_classificacao:
             dict_itens[item] = [pai]
 
-    return (dict_itens)
+    return dict_itens
+
+
+@app.route('/api/atualizaCsv', methods=['POST'])
+def post_atualiza_csv():
+    csv_download = request.args.get('csvDownload')
+    if not csv_download:
+        return jsonify({"error": "Parâmetros obrigatórios faltando. Obrigatório: csvDownload"})
+
+    data = percorre_json(abre_json(arquivo_origem), csv_download)
+
+    if data.get("subpagina"):
+        dir_aux = f'{data.get('pagina')}\\{data.get('subpagina')}'
+        nome_arquivo = f'{data.get('pagina')}_{data.get('subpagina')}'
+    else:
+        dir_aux = f'{data.get('pagina')}'
+        nome_arquivo = f'{data.get('pagina')}'
+
+    diretorio_csv = os.getcwd() + '\\CSVs\\' + dir_aux
+    user = 'Marcel Firkowski'  # Ajustar para pegar o usuário autenticado que fez a requisição
+    path_arquivo = download_csv(url_home + csv_download, diretorio_csv, nome_arquivo, user)
+
+    return jsonify(({"status": f"Atualizado com sucesso arquivo {path_arquivo}"}))
 
 
 @app.route('/')

@@ -1,0 +1,152 @@
+[
+    {
+        "pagina": "Produção",
+        "codPagina": "opt_02",
+        "subpagina": null,
+        "codSubpagina": null,
+        "csvDownload": "download/Producao.csv",
+        "item": "Produto",
+        "feature0": "Quantidade (L.)",
+        "feature1": null
+    },
+    {
+        "pagina": "Processamento",
+        "codPagina": "opt_03",
+        "subpagina": "Viníferas",
+        "codSubpagina": "subopt_01",
+        "csvDownload": "download/ProcessaViniferas.csv",
+        "item": "Cultivar",
+        "feature0": "Quantidade (Kg)",
+        "feature1": null
+    },
+    {
+        "pagina": "Processamento",
+        "codPagina": "opt_03",
+        "subpagina": "Americanas e híbridas",
+        "codSubpagina": "subopt_02",
+        "csvDownload": "download/ProcessaAmericanas.csv",
+        "item": "Cultivar",
+        "feature0": "Quantidade (Kg)",
+        "feature1": null
+    },
+    {
+        "pagina": "Processamento",
+        "codPagina": "opt_03",
+        "subpagina": "Uvas de mesa",
+        "codSubpagina": "subopt_03",
+        "csvDownload": "download/ProcessaMesa.csv",
+        "item": "Cultivar",
+        "feature0": "Quantidade (Kg)",
+        "feature1": null
+    },
+    {
+        "pagina": "Processamento",
+        "codPagina": "opt_03",
+        "subpagina": "Sem classificação",
+        "codSubpagina": "subopt_04",
+        "csvDownload": "download/ProcessaSemclass.csv",
+        "item": "Cultivar",
+        "feature0": "Quantidade (Kg)",
+        "feature1": null
+    },
+    {
+        "pagina": "Comercialização",
+        "codPagina": "opt_04",
+        "subpagina": null,
+        "codSubpagina": null,
+        "csvDownload": "download/Comercio.csv",
+        "item": "Produto",
+        "feature0": "Quantidade (L.)",
+        "feature1": null
+    },
+    {
+        "pagina": "Importação",
+        "codPagina": "opt_05",
+        "subpagina": "Vinhos de mesa",
+        "codSubpagina": "subopt_01",
+        "csvDownload": "download/ImpVinhos.csv",
+        "item": "Países",
+        "feature0": "Quantidade (Kg)",
+        "feature1": "Valor (US$)"
+    },
+    {
+        "pagina": "Importação",
+        "codPagina": "opt_05",
+        "subpagina": "Espumantes",
+        "codSubpagina": "subopt_02",
+        "csvDownload": "download/ImpEspumantes.csv",
+        "item": "Países",
+        "feature0": "Quantidade (Kg)",
+        "feature1": "Valor (US$)"
+    },
+    {
+        "pagina": "Importação",
+        "codPagina": "opt_05",
+        "subpagina": "Uvas frescas",
+        "codSubpagina": "subopt_03",
+        "csvDownload": "download/ImpFrescas.csv",
+        "item": "Países",
+        "feature0": "Quantidade (Kg)",
+        "feature1": "Valor (US$)"
+    },
+    {
+        "pagina": "Importação",
+        "codPagina": "opt_05",
+        "subpagina": "Uvas passas",
+        "codSubpagina": "subopt_04",
+        "csvDownload": "download/ImpPassas.csv",
+        "item": "Países",
+        "feature0": "Quantidade (Kg)",
+        "feature1": "Valor (US$)"
+    },
+    {
+        "pagina": "Importação",
+        "codPagina": "opt_05",
+        "subpagina": "Suco de uva",
+        "codSubpagina": "subopt_05",
+        "csvDownload": "download/ImpSuco.csv",
+        "item": "Países",
+        "feature0": "Quantidade (Kg)",
+        "feature1": "Valor (US$)"
+    },
+    {
+        "pagina": "Exportação",
+        "codPagina": "opt_06",
+        "subpagina": "Vinhos de mesa",
+        "codSubpagina": "subopt_01",
+        "csvDownload": "download/ExpVinho.csv",
+        "item": "Países",
+        "feature0": "Quantidade (Kg)",
+        "feature1": "Valor (US$)"
+    },
+    {
+        "pagina": "Exportação",
+        "codPagina": "opt_06",
+        "subpagina": "Espumantes",
+        "codSubpagina": "subopt_02",
+        "csvDownload": "download/ExpEspumantes.csv",
+        "item": "Países",
+        "feature0": "Quantidade (Kg)",
+        "feature1": "Valor (US$)"
+    },
+    {
+        "pagina": "Exportação",
+        "codPagina": "opt_06",
+        "subpagina": "Uvas frescas",
+        "codSubpagina": "subopt_03",
+        "csvDownload": "download/ExpUva.csv",
+        "item": "Países",
+        "feature0": "Quantidade (Kg)",
+        "feature1": "Valor (US$)"
+    },
+    {
+        "pagina": "Exportação",
+        "codPagina": "opt_06",
+        "subpagina": "Suco de uva",
+        "codSubpagina": "subopt_04",
+        "csvDownload": "download/ExpSuco.csv",
+        "item": "Países",
+        "feature0": "Quantidade (Kg)",
+        "feature1": "Valor (US$)"
+    }
+]
