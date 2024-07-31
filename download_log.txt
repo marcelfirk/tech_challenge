@@ -13,3 +13,4 @@
 2024-07-29 21:29:50: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Exportação\Espumantes\Exportação_Espumantes_20240729212950.csv - user: Marcel Firkowski
 2024-07-29 21:29:52: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Exportação\Uvas frescas\Exportação_Uvas frescas_20240729212952.csv - user: Marcel Firkowski
 2024-07-29 21:29:54: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Exportação\Suco de uva\Exportação_Suco de uva_20240729212954.csv - user: Marcel Firkowski
+2024-07-30 23:24:34: C:\PyCharm\PycharmProjects\tech_challenge\CSVs\Processamento\Viníferas\Processamento_Viníferas_20240730232434.csv - user: Marcel Firkowski

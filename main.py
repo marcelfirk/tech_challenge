@@ -26,18 +26,18 @@ def movimenta_csv_para_backup(diretorio, prefixo):
                 os.makedirs(diretorio_backup)
             path_origem = os.path.join(diretorio, arquivo)
             path_destino = f'{diretorio_backup}\\{arquivo}'
-            shutil.move(path_origem,path_destino)
+            shutil.move(path_origem, path_destino)
 
 
-def download_csv(url, diretorio_csv, nome_arquivo, user):
+def download_csv(url, diretorio, nome_arquivo, user):
     response = requests.get(url)
     response.raise_for_status()
-    if not os.path.exists(diretorio_csv):
-        os.makedirs(diretorio_csv)
+    if not os.path.exists(diretorio):
+        os.makedirs(diretorio)
     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-    movimenta_csv_para_backup(diretorio_csv, nome_arquivo)
+    movimenta_csv_para_backup(diretorio, nome_arquivo)
     nome_arquivo = f"{nome_arquivo}_{timestamp}.csv"
-    path_arquivo = os.path.join(diretorio_csv, nome_arquivo)
+    path_arquivo = os.path.join(diretorio, nome_arquivo)
     with open(path_arquivo, 'wb') as file:
         file.write(response.content)
     log_download(path_arquivo, user)
@@ -63,8 +63,8 @@ def abre_json(nome_arquivo):
         return None
 
 
-def percorre_json(data_a_percorrer, campo1, valor1, campo2=None, valor2=None):
-    for entry in data_a_percorrer:
+def percorre_json(dados, campo1, valor1, campo2=None, valor2=None):
+    for entry in dados:
         if valor2 is None:
             if entry.get(campo1) == valor1:
                 return entry
@@ -74,49 +74,50 @@ def percorre_json(data_a_percorrer, campo1, valor1, campo2=None, valor2=None):
     return None
 
 
-# Funções globais
-def geturl(url: str) -> bytes:
+def geturl(url):
     try:
         response = requests.get(url)
         response.raise_for_status()
         return response.content
     except requests.RequestException:
-        return b''
+        return None
 
 
-def url_sopt(opt: str, sopt: str) -> str:
+def url_sopt(opt, sopt):
     return f'http://vitibrasil.cnpuv.embrapa.br/index.php?subopcao={sopt}&opcao={opt}'
 
 
-def url_sopt_ano(opt: str, sopt: str, ano: str) -> str:
+def url_sopt_ano(opt, sopt, ano):
     return f'http://vitibrasil.cnpuv.embrapa.br/index.php?ano={ano}&subopcao={sopt}&opcao={opt}'
 
 
 def pesquisa_site(html_pagina_sopt, pai, filho):
     try:
         headers = html_pagina_sopt.thead
+        table = html_pagina_sopt.tbody
     except AttributeError:
         return jsonify({"error": "Erro, verifique se passou parâmetros corretos de paginas e subpaginas"}), 400
-    table = html_pagina_sopt.tbody
-    lista_headers = []
-    lista_resultados = {}
+
+    lista_resultados = []
     if headers:
-        ths = headers.find_all('th')
-        lista_headers = [th.text.strip() for th in ths]
+        lista_headers = [th.text.strip() for th in headers.find_all('th')]
     else:
         return jsonify({"error": "Erro, verifique se passou parâmetros corretos de paginas e subpaginas"}), 400
     if table:
         trs = table.find_all('tr')
+        control = None
         found = False
-        escopo = False if pai else True
         for tr in trs:
             tds = tr.find_all('td')
-            if "tb_item" in tds[0].get('class', []) and not escopo:
-                escopo = True if tds[0].text.strip() == pai else False
-            if tds[0].text.strip() == filho and escopo:
-                lista_resultados = {lista_headers[j]: tds[j].text.strip() for j in range(len(tds))}
+            if "tb_item" in tds[0].get('class', []):
+                control = tds[0].text.strip()
+            if tds[0].text.strip() == filho:
+                resultado = {lista_headers[j]: tds[j].text.strip() for j in range(len(tds))}
+                if control:
+                    resultado['Control'] = control
+                if (pai and control == pai) or not pai:
+                    lista_resultados.append(resultado)
                 found = True
-                break
         if not found:
             return jsonify({"error": "Item não encontrado no escopo solicitado"}), 400
     else:
@@ -125,8 +126,8 @@ def pesquisa_site(html_pagina_sopt, pai, filho):
     return jsonify(lista_resultados)
 
 
-def detectar_delimitador(file_path):
-    with open(file_path, 'r', encoding='utf-8') as file:
+def detectar_delimitador(arquivo):
+    with open(arquivo, 'r', encoding='utf-8') as file:
         sample = file.read(-1)
         sniffer = csv.Sniffer()
         try:
@@ -136,12 +137,18 @@ def detectar_delimitador(file_path):
     return delimiter
 
 
-def pesquisa_valor(dataframe, nome_coluna, valor_coluna, ano):
+def pesquisa_valor(dataframe, nome_coluna, valor_coluna, ano, control):
     # Filter the DataFrame for the specific country and year
-    result = dataframe.query(f'{nome_coluna} == @valor_coluna and ano == @ano')
-    result_json_str = result.to_json(orient='records', date_format='iso', force_ascii=False)
-    result_json = json.loads(result_json_str)
-    return result_json
+    if not control:
+        result = dataframe.query(f'{nome_coluna} == @valor_coluna and ano == @ano')
+        result_json_str = result.to_json(orient='records', date_format='iso', force_ascii=False)
+        result_json = json.loads(result_json_str)
+        return result_json
+    else:
+        result = dataframe.query(f'{nome_coluna} == @valor_coluna and ano == @ano and control == @control')
+        result_json_str = result.to_json(orient='records', date_format='iso', force_ascii=False)
+        result_json = json.loads(result_json_str)
+        return result_json
 
 
 def verifica_nome_arquivo(diretorio, prefixo):
@@ -153,8 +160,7 @@ def verifica_nome_arquivo(diretorio, prefixo):
             return None
 
 
-def pesquisa_csv(cod_pagina, cod_subpagina, ano, valor_coluna):
-    selecao = percorre_json(abre_json('lista_paginas.json'), 'codPagina', cod_pagina, 'codSubpagina', cod_subpagina)
+def pesquisa_csv(selecao, ano, valor_coluna, control=None):
     diretorio = os.path.join(os.getcwd(), 'CSVs', selecao.get('pagina'))
     prefixo = selecao.get('pagina')
     if selecao.get('codSubpagina'):
@@ -168,24 +174,24 @@ def pesquisa_csv(cod_pagina, cod_subpagina, ano, valor_coluna):
     colunas_precedentes = colunas[:index_1970]
     colunas_para_limpar = colunas[1:index_1970]
     df[colunas_para_limpar] = df[colunas_para_limpar].apply(lambda x: x.str.strip() if x.dtype == "object" else x)
-    df_transposta = df.melt(id_vars=colunas_precedentes, var_name="ano", value_name="valor")
-    df_transposta["ano"] = df_transposta["ano"].str.replace(".1", "")
-    if 'control' in df_transposta.columns and df_transposta['control'].notnull().any():
-        df_transposta['control'] = substituir_valor(df_transposta['control'])
+    df_pivotada = df.melt(id_vars=colunas_precedentes, var_name="ano", value_name="valor")
+    df_pivotada["ano"] = df_pivotada["ano"].str.replace(".1", "")
+    if 'control' in df_pivotada.columns and df_pivotada['control'].notnull().any():
+        df_pivotada['control'] = substituir_valor(df_pivotada['control'])
     nome_coluna = colunas_precedentes[-1]
-    resultado = pesquisa_valor(df_transposta, nome_coluna, valor_coluna, ano)
+    resultado = pesquisa_valor(df_pivotada, nome_coluna, valor_coluna, ano, control)
     lista_resultados = []
     if selecao.get('feature1'):
         for i in range(len(resultado)):
             lista_resultados.append({
-                nome_coluna: resultado[i].get(nome_coluna),
+                selecao.get('item'): resultado[i].get(nome_coluna),
                 selecao.get(f'feature{i}'): resultado[i].get('valor')
             })
     else:
         for i in range(len(resultado)):
             lista_resultados.append({
-                'control': resultado[i].get('control'),
-                nome_coluna: resultado[i].get(nome_coluna),
+                'Control': resultado[i].get('control'),
+                selecao.get('item'): resultado[i].get(nome_coluna),
                 selecao.get('feature0'): resultado[i].get('valor')
             })
     return jsonify(lista_resultados)
@@ -197,6 +203,51 @@ def substituir_valor(col):
         col = col.where(~col.str.contains("_", na=False), col_anterior)
     return col
 
+
+def extrair_itens_site(data):
+    html_pagina_sopt = BeautifulSoup(
+        geturl(
+            url_sopt(data.get('codPagina'), data.get('codSubpagina'))
+        ), 'html.parser').find('table', attrs={"class": 'tb_base tb_dados'})
+    try:
+        headers = html_pagina_sopt.thead
+    except AttributeError:
+        return jsonify({"error": "Erro, verifique se passou parâmetros corretos de paginas e subpaginas"}), 400
+    table = html_pagina_sopt.tbody
+    if len(table) == 1:
+        return jsonify({"error": "Verifique os parâmetros enviados"}), 400
+    item = headers.find_all('th')[0].text.strip()
+
+    dict_itens = {}
+    sem_classificacao = True
+    if table:
+        trs = table.find_all('tr')
+        for i in range(len(trs)):
+            tds = trs[i].find_all('td')
+            if "tb_item" in tds[0].get('class', []):
+                pai = tds[0].text.strip()
+            elif "tb_subitem" in tds[0].get('class', []):
+                sem_classificacao = False
+                filho = tds[0].text.strip()
+                if pai in dict_itens:
+                    dict_itens[pai].append(filho)
+                else:
+                    dict_itens[pai] = [filho]
+            elif tds:
+                sem_classificacao = False
+                if item in dict_itens:
+                    dict_itens[item].append(tds[0].text.strip())
+                else:
+                    dict_itens[item] = [tds[0].text.strip()]
+
+        if sem_classificacao:
+            dict_itens[item] = [pai]
+
+    return dict_itens
+
+
+def extrair_itens_csv(dados):
+    return jsonify({"maluco": "preciso fazer esse código"})
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
@@ -281,8 +332,8 @@ def get_lista_paginas():
     return jsonify(lista_paginas)
 
 
-@app.route('/api/ultimaAtualizacao', methods=['GET'])
-def get_ultima_atualizacao():
+@app.route('/api/ultimaAtualizacaoSite', methods=['GET'])
+def get_ultima_atualizacao_site():
     # Home para scrapping inicial
     html = BeautifulSoup(geturl(url_home), 'html.parser')
     data_mod_str = html.find('table', attrs={"class": 'tb_base tb_footer'}).td.text.split()[-1]
@@ -290,7 +341,7 @@ def get_ultima_atualizacao():
     return jsonify(data_mod)
 
 
-@app.route('/api/disponibilidade', methods=['GET'])
+@app.route('/api/disponibilidadeSite', methods=['GET'])
 def get_disponibilidade():
     try:
         response = requests.get(url_home)
@@ -300,24 +351,30 @@ def get_disponibilidade():
     return jsonify({"status": status})
 
 
-@app.route('/api/pesquisa', methods=['GET'])
+@app.route('/api/pesquisaItem', methods=['GET'])
 # @jwt_required()
-def get_pesquisa():
-    cod_pagina = request.args.get('codPagina')
-    cod_subpagina = request.args.get('codSubpagina')
+def get_pesquisa_item():
+    pagina = request.args.get('pagina')
+    subpagina = request.args.get('subpagina')
     ano = request.args.get('ano')
     pai = request.args.get('itemPai')
     filho = request.args.get('item')
+    origem = request.args.get('origem')
 
-    site_offline = True
+    if not filho or not pagina or not ano:
+        return jsonify({"error": "Parâmetros obrigatórios insuficientes. Obrigatórios: pagina, ano, item"}), 400
 
-    if not filho or not cod_pagina or not ano:
-        return jsonify({"error": "Parâmetros obrigatórios insuficientes. Obrigatórios: codPagina, ano, item"}), 400
+    dados = percorre_json(abre_json(arquivo_origem), 'pagina', pagina, 'subpagina', subpagina)
+
+    if origem == 'csv':
+        site_offline = True
+    else:
+        site_offline = False
 
     try:
         html_pagina_sopt = BeautifulSoup(
             geturl(
-                url_sopt_ano(cod_pagina, cod_subpagina, ano)
+                url_sopt_ano(dados.get('codPagina'), dados.get('codSubpagina'), ano)
             ), 'html.parser').find('table', attrs={"class": 'tb_base tb_dados'})
     except requests.exceptions.RequestException:
         site_offline = True
@@ -326,65 +383,39 @@ def get_pesquisa():
         return pesquisa_site(html_pagina_sopt, pai, filho)
 
     else:
-        return pesquisa_csv(cod_pagina, cod_subpagina, ano, filho)
+        if pai:
+            return pesquisa_csv(dados, subpagina, ano, filho, pai)
+        else:
+            return pesquisa_csv(dados, subpagina, ano, filho)
 
 
 @app.route('/api/getItens', methods=['GET'])
 # @jwt_required()
 def get_params():
-    cod_pagina = request.args.get('codPagina')
-    cod_subpagina = request.args.get('codSubpagina')
-    if not cod_pagina:
-        return jsonify({"error": "Parâmetros obrigatórios insuficientes. Obrigatórios: codPagina"}), 400
+    pagina = request.args.get('pagina')
+    subpagina = request.args.get('subpagina')
+    origem = request.args.get('origem')
 
-    html_pagina_sopt = BeautifulSoup(
-        geturl(
-            url_sopt(cod_pagina, cod_subpagina)
-        ), 'html.parser').find('table', attrs={"class": 'tb_base tb_dados'})
-    try:
-        headers = html_pagina_sopt.thead
-    except AttributeError as e:
-        return jsonify({"error": "Erro, verifique se passou parâmetros corretos de paginas e subpaginas"}), 400
-    table = html_pagina_sopt.tbody
-    if len(table) == 1:
-        return jsonify({"error": "Verifique os parâmetros enviados"}), 400
-    item = headers.find_all('th')[0].text.strip()
+    if not pagina:
+        return jsonify({"error": "Parâmetros obrigatórios insuficientes. Obrigatórios: Pagina"}), 400
 
-    dict_itens = {}
-    sem_classificacao = True
-    if table:
-        trs = table.find_all('tr')
-        for i in range(len(trs)):
-            tds = trs[i].find_all('td')
-            if "tb_item" in tds[0].get('class', []):
-                pai = tds[0].text.strip()
-            elif "tb_subitem" in tds[0].get('class', []):
-                sem_classificacao = False
-                filho = tds[0].text.strip()
-                if pai in dict_itens:
-                    dict_itens[pai].append(filho)
-                else:
-                    dict_itens[pai] = [filho]
-            elif tds:
-                sem_classificacao = False
-                if item in dict_itens:
-                    dict_itens[item].append(tds[0].text.strip())
-                else:
-                    dict_itens[item] = [tds[0].text.strip()]
+    dados = percorre_json(abre_json(arquivo_origem), 'pagina', pagina, 'subpagina', subpagina)
 
-        if sem_classificacao:
-            dict_itens[item] = [pai]
-
-    return dict_itens
+    if origem == 'csv':
+        return extrair_itens_csv(dados)
+    else:
+        return extrair_itens_site(dados)
 
 
 @app.route('/api/atualizaCsv', methods=['POST'])
 def post_atualiza_csv():
-    csv_download = request.args.get('csvDownload')
-    if not csv_download:
-        return jsonify({"error": "Parâmetros obrigatórios faltando. Obrigatório: csvDownload"})
+    pagina = request.args.get('pagina')
+    subpagina = request.args.get('subpagina')
 
-    data = percorre_json(abre_json(arquivo_origem), csv_download)
+    if not pagina:
+        return jsonify({"error": "Parâmetros obrigatórios faltando. Obrigatório: pagina"})
+
+    data = percorre_json(abre_json(arquivo_origem), 'pagina', pagina, 'subpagina', subpagina)
 
     if data.get("subpagina"):
         dir_aux = f'{data.get('pagina')}\\{data.get('subpagina')}'
@@ -395,7 +426,7 @@ def post_atualiza_csv():
 
     diretorio_csv = os.getcwd() + '\\CSVs\\' + dir_aux
     user = 'Marcel Firkowski'  # Ajustar para pegar o usuário autenticado que fez a requisição
-    path_arquivo = download_csv(url_home + csv_download, diretorio_csv, nome_arquivo, user)
+    path_arquivo = download_csv(url_home + data.get('csvDownload'), diretorio_csv, nome_arquivo, user)
 
     return jsonify(({"status": f"Atualizado com sucesso arquivo {path_arquivo}"}))
 
