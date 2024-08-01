@@ -1,5 +1,6 @@
 from datetime import datetime
 import pandas as pd
+import pdb
 import shutil
 import os
 import fnmatch
@@ -156,19 +157,11 @@ def verifica_nome_arquivo(diretorio, prefixo):
     for arquivo in arquivos:
         if fnmatch.fnmatch(arquivo, f'{prefixo}*'):
             return os.path.join(diretorio, arquivo)
-        else:
-            return None
+    return None
 
 
 def pesquisa_csv(selecao, ano, valor_coluna, control=None):
-    diretorio = os.path.join(os.getcwd(), 'CSVs', selecao.get('pagina'))
-    prefixo = selecao.get('pagina')
-    if selecao.get('codSubpagina'):
-        diretorio = os.path.join(diretorio, selecao.get('subpagina'))
-        prefixo = f"{prefixo}_{selecao.get('subpagina')}"
-    arquivo = verifica_nome_arquivo(diretorio, prefixo)
-    delimiter = detectar_delimitador(arquivo)
-    df = pd.read_csv(arquivo, sep=delimiter, encoding='utf-8')
+    df = csv_para_dataframe(selecao)
     colunas = df.columns.tolist()
     index_1970 = colunas.index('1970')
     colunas_precedentes = colunas[:index_1970]
@@ -246,8 +239,41 @@ def extrair_itens_site(data):
     return dict_itens
 
 
+def csv_para_dataframe(dados):
+    diretorio = os.path.join(os.getcwd(), 'CSVs', dados.get('pagina'))
+    prefixo = dados.get('pagina')
+    if dados.get('codSubpagina'):
+        diretorio = os.path.join(diretorio, dados.get('subpagina'))
+        prefixo = f"{prefixo}_{dados.get('subpagina')}"
+    arquivo = verifica_nome_arquivo(diretorio, prefixo)
+    delimiter = detectar_delimitador(arquivo)
+    return pd.read_csv(arquivo, sep=delimiter, encoding='utf-8')
+
+
 def extrair_itens_csv(dados):
-    return jsonify({"maluco": "preciso fazer esse código"})
+    df = csv_para_dataframe(dados)
+    colunas = df.columns.tolist()
+    index_1970 = colunas.index('1970')
+    colunas_precedentes = colunas[:index_1970]
+    colunas_para_limpar = colunas[1:index_1970]
+    df[colunas_para_limpar] = df[colunas_para_limpar].apply(lambda x: x.str.strip() if x.dtype == "object" else x)
+    if 'control' in df.columns and df['control'].notnull().any():
+        df['control'] = substituir_valor(df['control'])
+        dict_itens = {}
+        aux = 'z'
+        for index, row in df.iterrows():
+            if aux in dict_itens:
+                if row.iloc[index_1970 - 1] != aux:
+                    dict_itens[aux].append(row.iloc[index_1970-1])
+            else:
+                pdb.set_trace()
+                aux = row.iloc[index_1970-1]
+                dict_itens[aux] = []
+        return jsonify(dict_itens)
+    else:
+        return jsonify({dados.get('item'): df.iloc[:, index_1970-1].tolist()})
+
+
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
