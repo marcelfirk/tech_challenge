@@ -258,17 +258,15 @@ def extrair_itens_csv(dados):
     colunas_para_limpar = colunas[1:index_1970]
     df[colunas_para_limpar] = df[colunas_para_limpar].apply(lambda x: x.str.strip() if x.dtype == "object" else x)
     if 'control' in df.columns and df['control'].notnull().any():
-        df['control'] = substituir_valor(df['control'])
         dict_itens = {}
-        aux = 'z'
+        nome_control_produto = 'z'
         for index, row in df.iterrows():
-            if aux in dict_itens:
-                if row.iloc[index_1970 - 1] != aux:
-                    dict_itens[aux].append(row.iloc[index_1970-1])
+            if '_' in row.iloc[index_1970 - 2]:
+                if row.iloc[index_1970 - 1] != nome_control_produto:
+                    dict_itens[nome_control_produto].append(row.iloc[index_1970-1])
             else:
-                pdb.set_trace()
-                aux = row.iloc[index_1970-1]
-                dict_itens[aux] = []
+                nome_control_produto = row.iloc[index_1970-1]
+                dict_itens[nome_control_produto] = []
         return jsonify(dict_itens)
     else:
         return jsonify({dados.get('item'): df.iloc[:, index_1970-1].tolist()})
