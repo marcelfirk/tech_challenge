@@ -1,5 +1,4 @@
 username,password,role
-marcelfirkowski,senha123,admin
-Teley,teley1991,admin
-novousuario,senhanovousuario,admin
-novousuarioreg,senhanovousuario,user
+marcelfirkowski,$2b$12$QKnXZzZ0O0paXdRcajxhZeWqiHWFvTjvj.qWOXn7ENAlo6aum.Iei,admin
+Teley,$2b$12$y4ISTUEv7lPZXRdLDLhPv.eoW90myh8rm2puv5ofx1BxHtzRQB2FC,admin
+emanuelsousa,$2b$12$jebPpJwi74DY0LKQBcP.BehtGR6nSr0sw1Ns3FeRQATtMGN07fdSe,user

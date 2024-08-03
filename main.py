@@ -7,9 +7,9 @@ import fnmatch
 import json
 import requests
 from bs4 import BeautifulSoup
-from flask_bcrypt import Bcrypt
+import bcrypt
 import csv
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response
 from flask_restful import Api, Resource
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from paginasDados import PaginasDados
@@ -275,11 +275,23 @@ def extrair_itens_csv(dados):
         return jsonify({dados.get('item'): df.iloc[:, index_1970-1].tolist()})
 
 
+def hash_password(password):
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+
+def check_password(password, hashed_password):
+    return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
+
+
+def carrega_users():
+    return pd.read_csv(os.path.join(os.getcwd(), arquivo_users), sep=',', encoding='utf-8')
+
+
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
 app.config['JWT_SECRET_KEY'] = 'marcelGabriel'
 jwt = JWTManager(app)
-users = pd.read_csv(os.path.join(os.getcwd(), arquivo_users), sep=',', encoding='utf-8')
+
 
 
 class UserLogin(Resource):
@@ -288,14 +300,16 @@ class UserLogin(Resource):
             return jsonify({"error": "Request JSON não encontrado"}), 400
         username = request.json.get('username', None)
         password = request.json.get('password', None)
-        user = False
+        users = carrega_users()
 
-        user = users.loc[(users['username'] == username) & (users['password'] == password)]
-
+        user = users.loc[(users['username'] == username)]
         if not user.empty:
-            access_token = create_access_token(identity={'username': username, 'role': user.iloc[0]['role']})
-            return jsonify(access_token=access_token)
-        return jsonify({"error": "Usuário ou senha inválidos"}), 401
+            stored_password = user.iloc[0]['password']
+            if check_password(password, stored_password):
+                access_token = create_access_token(identity={'username': username, 'role': user.iloc[0]['role']})
+                return jsonify(access_token=access_token)
+        message = json.dumps({'error': 'Usuário ou senha inválidos'})
+        return Response(message, status=401, mimetype='application/json')
 
 
 @app.route('/novoUsuario', methods=['POST'])
@@ -305,6 +319,8 @@ def register():
     username = data.get('username')
     password = data.get('password')
     role = data.get('role')
+
+    users = carrega_users()
 
     if not username or not password or not role:
         return jsonify({"error": "Dados insuficientes para registro"}), 400
@@ -318,7 +334,7 @@ def register():
     if username in users['username'].values:
         return jsonify({"msg": "Usuário já existente"}), 409
 
-    df_novo_usuario = pd.DataFrame([{'username': username, 'password': password, 'role': role}])
+    df_novo_usuario = pd.DataFrame([{'username': username, 'password': hash_password(password), 'role': role}])
     df_users = users._append(df_novo_usuario, ignore_index=True)
     df_users.to_csv(arquivo_users, index=False)
     pd.read_csv(os.path.join(os.getcwd(), arquivo_users), sep=',', encoding='utf-8')
