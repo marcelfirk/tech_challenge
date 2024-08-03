@@ -7,15 +7,18 @@ import fnmatch
 import json
 import requests
 from bs4 import BeautifulSoup
-from flask import Flask, jsonify, request
+from flask_bcrypt import Bcrypt
 import csv
-# from flask_jwt_extended import jwt_required
+from flask import Flask, jsonify, request
+from flask_restful import Api, Resource
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from paginasDados import PaginasDados
 
 # Parâmetros globais
 url_home = 'http://vitibrasil.cnpuv.embrapa.br/'
 url_opt = 'http://vitibrasil.cnpuv.embrapa.br/index.php?opcao='
 arquivo_origem = 'lista_paginas.json'
+arquivo_users = 'users.csv'
 
 
 def movimenta_csv_para_backup(diretorio, prefixo):
@@ -272,32 +275,58 @@ def extrair_itens_csv(dados):
         return jsonify({dados.get('item'): df.iloc[:, index_1970-1].tolist()})
 
 
-
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
+app.config['JWT_SECRET_KEY'] = 'marcelGabriel'
+jwt = JWTManager(app)
+users = pd.read_csv(os.path.join(os.getcwd(), arquivo_users), sep=',', encoding='utf-8')
 
-# Cria uma chave para a autenticação JWT
-# app.config['JWT_SECRET_KEY'] = 'marcelGabriel'  # Troque por uma chave secreta forte
-# jwt = JWTManager(app)
 
-# Rota de login
-# @app.route('/login', methods=['POST'])
-# def post_login():
-#     if not request.is_json:
-#         return jsonify({"msg": "Missing JSON in request"}), 400
-#
-#     username = request.json.get('username', None)
-#     password = request.json.get('password', None)
-#
-#     if username != 'Teley' or password != 'teley1991':  # Validação simples, substitua pelo seu método de validação
-#         return jsonify({"msg": "Bad username or password"}), 401
-#
-#     access_token = create_access_token(identity=username)
-#     return jsonify(access_token=access_token), 200
+class UserLogin(Resource):
+    def post(self):
+        if not request.is_json:
+            return jsonify({"error": "Request JSON não encontrado"}), 400
+        username = request.json.get('username', None)
+        password = request.json.get('password', None)
+        user = False
+
+        user = users.loc[(users['username'] == username) & (users['password'] == password)]
+
+        if not user.empty:
+            access_token = create_access_token(identity={'username': username, 'role': user.iloc[0]['role']})
+            return jsonify(access_token=access_token)
+        return jsonify({"error": "Usuário ou senha inválidos"}), 401
+
+
+@app.route('/novoUsuario', methods=['POST'])
+@jwt_required()
+def register():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    role = data.get('role')
+
+    if not username or not password or not role:
+        return jsonify({"error": "Dados insuficientes para registro"}), 400
+
+    usuario_atual = get_jwt_identity()
+    role_usuario_atual = usuario_atual['role']
+
+    if role_usuario_atual != 'admin':
+        return jsonify({"msg": "Usuário sem permissão de criação de usuários"})
+
+    if username in users['username'].values:
+        return jsonify({"msg": "Usuário já existente"}), 409
+
+    df_novo_usuario = pd.DataFrame([{'username': username, 'password': password, 'role': role}])
+    df_users = users._append(df_novo_usuario, ignore_index=True)
+    df_users.to_csv(arquivo_users, index=False)
+    pd.read_csv(os.path.join(os.getcwd(), arquivo_users), sep=',', encoding='utf-8')
+    return jsonify({"msg": f"Usuário {username} criado com sucesso, role: {role}"}), 201
 
 
 @app.route('/api/listaPaginas', methods=['GET'])
-# @jwt_required()
+@jwt_required()
 def get_lista_paginas():
     # Inicializando a lista localmente
     lista_paginas = []
@@ -357,6 +386,7 @@ def get_lista_paginas():
 
 
 @app.route('/api/ultimaAtualizacaoSite', methods=['GET'])
+@jwt_required()
 def get_ultima_atualizacao_site():
     # Home para scrapping inicial
     html = BeautifulSoup(geturl(url_home), 'html.parser')
@@ -366,6 +396,7 @@ def get_ultima_atualizacao_site():
 
 
 @app.route('/api/disponibilidadeSite', methods=['GET'])
+@jwt_required()
 def get_disponibilidade():
     try:
         response = requests.get(url_home)
@@ -376,7 +407,7 @@ def get_disponibilidade():
 
 
 @app.route('/api/pesquisaItem', methods=['GET'])
-# @jwt_required()
+@jwt_required()
 def get_pesquisa_item():
     pagina = request.args.get('pagina')
     subpagina = request.args.get('subpagina')
@@ -414,7 +445,7 @@ def get_pesquisa_item():
 
 
 @app.route('/api/getItens', methods=['GET'])
-# @jwt_required()
+@jwt_required()
 def get_params():
     pagina = request.args.get('pagina')
     subpagina = request.args.get('subpagina')
@@ -432,6 +463,7 @@ def get_params():
 
 
 @app.route('/api/atualizaCsv', methods=['POST'])
+@jwt_required()
 def post_atualiza_csv():
     pagina = request.args.get('pagina')
     subpagina = request.args.get('subpagina')
@@ -455,9 +487,8 @@ def post_atualiza_csv():
     return jsonify(({"status": f"Atualizado com sucesso arquivo {path_arquivo}"}))
 
 
-@app.route('/')
-def index():
-    return 'Hello!'
+api = Api(app)
+api.add_resource(UserLogin, '/login')
 
 
 if __name__ == '__main__':
