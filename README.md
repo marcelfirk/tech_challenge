@@ -12,3 +12,6 @@ https://documenter.getpostman.com/view/13216885/2sA3kdBxtz
 
 A imagem do Docker está disponível no Docker Hub seguindo o seguinte link:
 https://hub.docker.com/r/westerleycarvalho/tech_challenge
+
+O vídeo de apresentação do trabalho está disponível no Youtube no seguinte link:
+https://youtu.be/c2IhJyUSPcs
